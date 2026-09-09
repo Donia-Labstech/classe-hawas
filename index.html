@@ -668,6 +668,19 @@
         <div class="alert info" id="portalPublishStatus">
           ⚠️ نفّذ التوزيع أولًا من صفحة "الخريطة المدرسية" لتفعيل هذا الخيار.
         </div>
+
+        <!-- what will be embedded -->
+        <div id="portalInstPreview" style="border:1px solid var(--line); border-radius:8px; padding:12px 15px; margin-bottom:12px; background:var(--paper);">
+          <div style="font-size:11px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.4px; margin-bottom:8px;">
+            📄 المعلومات التي ستُدرَج في البوابة
+          </div>
+          <div id="portalInstRows" style="font-size:12.5px; line-height:1.9;"></div>
+        </div>
+
+        <div class="alert warn" id="portalInstWarn" style="display:none;">
+          ⚠️ <b>معلومات المؤسسة ناقصة.</b> ستظهر البوابة للتلاميذ باسم عام بدل اسم مؤسستك.
+          أكمل البيانات من صفحة <b>"معلومات المؤسسة"</b> قبل التوليد.
+        </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <button class="btn gold" id="generatePortalBtn" disabled style="padding:11px 22px; font-size:14px;">
             🌐 توليد البوابة الإلكترونية وتنزيلها
@@ -677,8 +690,16 @@
           </span>
         </div>
         <div class="alert ok" id="portalDownloadedMsg" style="display:none; margin-top:12px;">
-          ✓ تم توليد البوابة — ارفع الملف على مستودع GitHub الخاص بك وشارك الرابط مع التلاميذ:
-          <br><code id="portalShareUrl" style="font-size:12px; word-break:break-all;"></code>
+          <b>✓ تم توليد البوابة بنجاح</b>
+          <div style="margin-top:8px; font-size:12.5px; line-height:1.9;">
+            <b>الخطوة التالية — مهمة:</b> ارفع الملف الذي نزّل الآن إلى مستودعك على GitHub
+            <b>واستبدل به الملف القديم</b> إن وُجد. البوابة ملف ثابت — التلاميذ يرون النسخة المرفوعة فقط،
+            وأي تعديل في التطبيق (اسم المؤسسة، التوزيع، الأفواج) <b>لن يظهر لهم حتى تعيد التوليد والرفع</b>.
+          </div>
+          <div style="margin-top:8px;">رابط البوابة بعد الرفع:<br>
+            <code id="portalShareUrl" style="font-size:12px; word-break:break-all;"></code>
+          </div>
+          <div id="portalStamp" style="margin-top:8px; font-size:11.5px; color:var(--ink-soft);"></div>
         </div>
       </div>
 
@@ -782,6 +803,15 @@ rebuildPools();
 ═══════════════════════════════════════════════════════════════ */
 
 /* ── Resolve which distribution options apply to a given level ── */
+/* ── HTML escaping: student names come from imported Excel files and may
+   contain <, >, &, quotes. Never inject them raw into markup. ── */
+function esc(v){
+  if (v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function optsFor(lvl){
   const cfg = STATE.config;
   if (cfg.optScope === 'custom' && cfg.levelOpts && cfg.levelOpts[lvl]){
@@ -1499,10 +1529,10 @@ function studentRowHtml(s, lvl, sectionKeys){
   const origin = s.status==='NEW' ? (s.origin||'') : (s.originSection!=null? ('فوج '+s.originSection):'');
   const opts = sectionKeys.map(k=>`<option value="${k}" ${String(k)===String(currentKeyOf(s,lvl))?'selected':''}>${k}</option>`).join('');
   return `<tr data-uid="${s.uid}">
-    <td>${s.name} ${s.b10?'<span title="مولود 2010 - له حق الإعادة" style="color:var(--gold);">★</span>':''}</td>
+    <td>${esc(s.name)} ${s.b10?'<span title="مولود 2010 - له حق الإعادة" style="color:var(--gold);">★</span>':''}</td>
     <td><button class="g-toggle" data-uid="${s.uid}" data-lvl="${lvl}" title="اضغط لتغيير الجنس">${s.g==='M'?'ذكر':'أنثى'}</button></td>
-    <td>${s.dob}</td><td>${decisionBadge(s)}</td>
-    <td style="font-size:10.5px; color:var(--ink-soft);">${origin}</td>
+    <td>${esc(s.dob)}</td><td>${decisionBadge(s)}</td>
+    <td style="font-size:10.5px; color:var(--ink-soft);">${esc(origin)}</td>
     <td>${s.avg!=null? s.avg.toFixed(2):''}</td>
     <td><select class="move-sel" data-uid="${s.uid}" data-lvl="${lvl}">${opts}</select></td>
     <td><button class="del-btn" data-uid="${s.uid}" data-lvl="${lvl}" title="حذف من القائمة">✕</button></td>
@@ -1545,7 +1575,7 @@ function renderLevelPanel(lvl){
     const male = (secObj[k]||[]).filter(s=>s.g==='M').length, female = (secObj[k]||[]).length-male;
     const repCount = (secObj[k]||[]).filter(s=>s.status==='REPEAT').length;
     return `<div class="section-card${isSingleView?' full':''}">
-      <div class="sc-head"><span class="name">فوج ${k}</span><span class="meta">${(secObj[k]||[]).length} تلميذ · ${male} ذ / ${female} إ ${repCount? ' · '+repCount+' معيد':''}</span></div>
+      <div class="sc-head"><span class="name">فوج ${esc(k)}</span><span class="meta">${(secObj[k]||[]).length} تلميذ · ${male} ذ / ${female} إ ${repCount? ' · '+repCount+' معيد':''}</span></div>
       <div class="sc-body"><table class="roster">
         <thead><tr><th>الاسم</th><th>الجنس</th><th>الميلاد</th><th>الحالة</th><th>الأصل</th><th>المعدل</th><th>نقل إلى</th><th></th></tr></thead>
         <tbody>${students.map(s=>studentRowHtml(s, lvl, keys)).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--ink-soft);padding:16px;">لا يوجد تلاميذ مطابقون</td></tr>'}</tbody>
@@ -1616,7 +1646,7 @@ function renderSpecial(){
     html += `<div class="card"><h3>معيدو ${LEVEL_LABEL[lvl]} (${reps.length})</h3>
       <div class="hint">سيلتحقون بأفواج ${LEVEL_LABEL[lvl]} الجديدة المذكورة في الجدول</div>
       ${reps.length ? `<table class="summary-table"><tr><th>الاسم</th><th>الجنس</th><th>تاريخ الميلاد</th><th>الفوج الجديد</th></tr>
-        ${reps.map(s=>`<tr><td>${s.name}</td><td>${s.g==='M'?'ذكر':'أنثى'}</td><td>${s.dob}</td><td>فوج ${s.newSection}</td></tr>`).join('')}
+        ${reps.map(s=>`<tr><td>${esc(s.name)}</td><td>${s.g==='M'?'ذكر':'أنثى'}</td><td>${esc(s.dob)}</td><td>فوج ${esc(s.newSection)}</td></tr>`).join('')}
       </table>` : '<div style="color:var(--ink-soft); font-size:13px;">لا يوجد</div>'}</div>`;
   });
   const directed = RAW_DATA.current.filter(r=>r.dec==='V').map(r=>({ln:r.ln, fn:r.fn, g:r.g, dob:r.dob, sec:r.sec}));
@@ -1624,57 +1654,202 @@ function renderSpecial(){
   html += `<div class="card"><h3>الموجَّهون إلى مراكز التكوين المهني (${directed.length})</h3>
     <div class="hint">قرار نهائي من محضر مجلس القبول والتوجيه — يغادرون المؤسسة، لا يظهرون في قوائم العام القادم</div>
     ${directed.length ? `<table class="summary-table"><tr><th>الاسم</th><th>الجنس</th><th>تاريخ الميلاد</th><th>الفوج الأصلي</th></tr>
-      ${directed.map(s=>`<tr><td>${s.ln} ${s.fn}</td><td>${s.g==='M'?'ذكر':'أنثى'}</td><td>${s.dob}</td><td>فوج ${s.sec}</td></tr>`).join('')}
+      ${directed.map(s=>`<tr><td>${esc(s.ln)} ${esc(s.fn)}</td><td>${s.g==='M'?'ذكر':'أنثى'}</td><td>${esc(s.dob)}</td><td>فوج ${esc(s.sec)}</td></tr>`).join('')}
     </table>` : '<div style="color:var(--ink-soft); font-size:13px;">لا يوجد</div>'}</div>`;
   html += `<div class="card"><h3>أرشيف إعلامي — الناجحون المتجهون إلى الثانوية (${leftSuccessCount})</h3>
     <div class="hint">يغادرون المؤسسة نهائيًا بعد النجاح في شهادة التعليم المتوسط</div></div>`;
   el.innerHTML = html;
 }
 
-function letterheadRows(title){
-  return [ [STATE.institution.republic], [STATE.institution.ministry],
-    [STATE.institution.directorate ? ('مديرية التربية لولاية ' + STATE.institution.directorate) : ''],
-    [STATE.institution.school || ''], [title], [] ];
+/* ═══════════════════════════════════════════════════════════════
+   EXCEL EXPORT — official Algerian ministry layout
+   • ورقة لكل قسم: قوائم تلاميذ قسم (بالترويسة والتعداد والإمضاءات)
+   • ورقة تعداد التلاميذ: جدد/معيدون لكل قسم مع المجاميع
+═══════════════════════════════════════════════════════════════ */
+
+/* اسم القسم بالصيغة الرسمية: "1 متوسط3" */
+function officialClassName(lvl, sec){ return lvl + ' متوسط' + sec; }
+
+/* ترويسة رسمية على ثلاثة أعمدة (يمين / وسط / يسار) */
+function officialHeader(cols, title){
+  const I = STATE.institution;
+  const pad = n => new Array(Math.max(0,n)).fill('');
+  const right = 'مديرية التربية لولاية ' + (I.directorate||'');
+  const mid   = I.republic || 'الجمهورية الجزائرية الديمقراطية الشعبية';
+  const rows = [];
+  // السطر 1: المديرية (يمين) — الجمهورية (وسط) — الموسم (يسار)
+  rows.push([right, ...pad(cols-3), mid, 'الموسم الدراسي : ' + (I.year||'')]);
+  // السطر 2: المؤسسة (يمين) — الوزارة (وسط)
+  rows.push([(I.school||''), ...pad(cols-3), (I.ministry||'وزارة التربية الوطنية'), '']);
+  rows.push(pad(cols));
+  // العنوان
+  rows.push([title, ...pad(cols-1)]);
+  rows.push(pad(cols));
+  return rows;
 }
-function buildSheetForSection(lvlLabel, sectionNum, students){
-  const header = letterheadRows(`القائمة الاسمية للتلاميذ — ${lvlLabel} — فوج ${sectionNum} — السنة الدراسية ${STATE.institution.year}`);
-  header.push(['الرقم','اللقب والاسم','الجنس','تاريخ الميلاد','الحالة','الأصل / الفوج السابق','آخر معدل معروف']);
-  const sorted = students.slice().sort((a,b)=>a.name.localeCompare(b.name,'ar'));
-  sorted.forEach((s,i)=> header.push([i+1, s.name, s.g==='M'?'ذكر':'أنثى', s.dob,
-    s.status==='NEW'?'وافد جديد':(s.status==='PROMOTED'?'منتقل':'معيد'),
-    s.status==='NEW' ? (s.origin||'') : ('فوج '+s.originSection),
-    s.avg!=null ? s.avg.toFixed(2) : '']));
-  const ws = XLSX.utils.aoa_to_sheet(header);
-  ws['!cols'] = [{wch:6},{wch:28},{wch:8},{wch:13},{wch:11},{wch:24},{wch:10}];
+
+/* إحصاء مجموعة تلاميذ: جدد/معيدون × ذكور/إناث */
+function tally(list){
+  const isRep = s => s.status === 'REPEAT';
+  const isM   = s => s.g === 'M';
+  const newM  = list.filter(s=>!isRep(s) &&  isM(s)).length;
+  const newF  = list.filter(s=>!isRep(s) && !isM(s)).length;
+  const repM  = list.filter(s=> isRep(s) &&  isM(s)).length;
+  const repF  = list.filter(s=> isRep(s) && !isM(s)).length;
+  return {
+    newM, newF, newT:newM+newF,
+    repM, repF, repT:repM+repF,
+    totM:newM+repM, totF:newF+repF, total:list.length
+  };
+}
+
+/* ── ورقة قسم واحد بالتنسيق الرسمي ── */
+function buildOfficialClassSheet(lvl, sec, students){
+  const COLS  = 8;
+  const title = 'قوائم تلاميذ قسم:  ' + officialClassName(lvl, sec);
+  const rows  = officialHeader(COLS, title);
+
+  rows.push(['الرقم','رقم التعريف','اللقب و الاسم','تاريخ الميلاد','معيد','الجنس','الصفة','ملاحظات']);
+
+  const sorted = students.slice().sort((a,b)=> a.name.localeCompare(b.name,'ar'));
+  sorted.forEach((s,i)=>{
+    const ex  = (STATE.studentExtras && STATE.studentExtras[s.uid]) || {};
+    const idn = s.id ? String(s.id).slice(-4) : '';
+    rows.push([
+      i+1,
+      idn,
+      s.name,
+      s.dob,
+      s.status==='REPEAT' ? 'نعم' : 'لا',
+      s.g==='M' ? 'ذكر' : 'أنثى',
+      ex.status || '',        // الصفة: داخلي / نصف داخلي / خارجي (تُملأ يدويًا)
+      ex.notes  || ''
+    ]);
+  });
+
+  // ── جدول التعداد أسفل القائمة ──
+  const t = tally(students);
+  rows.push([]);
+  rows.push(['', '', '', 'المجموع', 'خارجي', 'ن داخلي', 'داخلي', 'معيدون', 'جدد', '']);
+  rows.push(['', '', 'الذكور',  t.totM, '', '', '', t.repM, t.newM, '']);
+  rows.push(['', '', 'الإناث',  t.totF, '', '', '', t.repF, t.newF, '']);
+  rows.push(['', '', 'المجموع', t.total,'', '', '', t.repT, t.newT, '']);
+  rows.push([]);
+  const today = new Date().toISOString().slice(0,10);
+  rows.push([(STATE.institution.directorate||'') + ' في: ' + today]);
+  rows.push([]);
+  rows.push(['إمضاء مستشار التربية', '', '', 'إمضاء الناظر', '', '', 'إمضاء المديرية', '']);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:6},{wch:11},{wch:30},{wch:14},{wch:8},{wch:8},{wch:13},{wch:16}];
   return ws;
 }
+
+/* ── ورقة "تعداد التلاميذ" لكل المستويات ── */
+function buildCensusSheet(){
+  const I = STATE.institution;
+  const COLS = 10;
+  const rows = officialHeader(COLS, 'تعداد التلاميذ لموسم:  ' + (I.year||''));
+
+  rows.push(['القسم','ذكور','إناث','مجموع','ذكور','إناث','مجموع','ذكور','إناث','المجموع الكلي']);
+  rows.push(['',      'التلاميذ المعيدون','','','التلاميذ الجدد','','','المجموع','','']);
+
+  const G = {newM:0,newF:0,newT:0,repM:0,repF:0,repT:0,totM:0,totF:0,total:0};
+
+  [1,2,3,4].forEach(lvl=>{
+    const secObj = STATE.results[lvl] && STATE.results[lvl].sections;
+    if (!secObj) return;
+    const keys = Object.keys(secObj).sort((a,b)=>Number(a)-Number(b));
+    if (!keys.length) return;
+
+    const L = {newM:0,newF:0,newT:0,repM:0,repF:0,repT:0,totM:0,totF:0,total:0};
+    keys.forEach(k=>{
+      const t = tally(secObj[k]);
+      rows.push([
+        officialClassName(lvl,k),
+        t.repM, t.repF, t.repT,
+        t.newM, t.newF, t.newT,
+        t.totM, t.totF, t.total
+      ]);
+      Object.keys(L).forEach(p => L[p] += t[p]);
+    });
+    // مجموع المستوى
+    rows.push([lvl + ' متوسط', L.repM, L.repF, L.repT, L.newM, L.newF, L.newT, L.totM, L.totF, L.total]);
+    Object.keys(G).forEach(p => G[p] += L[p]);
+  });
+
+  rows.push(['المجمـــوع', G.repM, G.repF, G.repT, G.newM, G.newF, G.newT, G.totM, G.totF, G.total]);
+  rows.push([]);
+  rows.push([(I.directorate||'') + ' في: ' + new Date().toISOString().slice(0,10)]);
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:16},{wch:8},{wch:8},{wch:9},{wch:8},{wch:8},{wch:9},{wch:8},{wch:8},{wch:13}];
+  return ws;
+}
+
+/* ── تصدير مستوى كامل ── */
 function exportLevel(lvl){
   if (!STATE.results) return;
   const wb = XLSX.utils.book_new(); wb.Workbook = { Views: [{RTL:true}] };
   const secObj = STATE.results[lvl].sections;
   const keys = Object.keys(secObj).sort((a,b)=>Number(a)-Number(b));
-  keys.forEach(k=>{ XLSX.utils.book_append_sheet(wb, buildSheetForSection(LEVEL_LABEL[lvl], k, secObj[k]), 'فوج '+k); });
 
-  let reps = [];
+  // ورقة لكل قسم
+  keys.forEach(k=>{
+    XLSX.utils.book_append_sheet(wb, buildOfficialClassSheet(lvl, k, secObj[k]), officialClassName(lvl,k));
+  });
+
+  // ورقة المعيدين
+  const reps = [];
   keys.forEach(k=> secObj[k].forEach(s=>{ if (s.status==='REPEAT') reps.push({...s, newSection:k}); }));
-  const repHeader = letterheadRows('قائمة المعيدين — ' + LEVEL_LABEL[lvl]);
-  repHeader.push(['اللقب والاسم','الجنس','تاريخ الميلاد','الفوج الجديد']);
-  reps.forEach(s=> repHeader.push([s.name, s.g==='M'?'ذكر':'أنثى', s.dob, 'فوج '+s.newSection]));
-  const wsRep = XLSX.utils.aoa_to_sheet(repHeader);
-  wsRep['!cols'] = [{wch:28},{wch:8},{wch:13},{wch:10}];
-  XLSX.utils.book_append_sheet(wb, wsRep, 'المعيدون');
+  const rHead = officialHeader(6, 'قائمة التلاميذ المعيدين — ' + LEVEL_LABEL[lvl]);
+  rHead.push(['الرقم','رقم التعريف','اللقب و الاسم','تاريخ الميلاد','الجنس','القسم الجديد']);
+  reps.sort((a,b)=>Number(a.newSection)-Number(b.newSection))
+      .forEach((s,i)=> rHead.push([i+1, s.id?String(s.id).slice(-4):'', s.name, s.dob,
+                                   s.g==='M'?'ذكر':'أنثى', officialClassName(lvl,s.newSection)]));
+  const wsR = XLSX.utils.aoa_to_sheet(rHead);
+  wsR['!cols']=[{wch:6},{wch:11},{wch:30},{wch:14},{wch:8},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, wsR, 'المعيدون');
 
+  // ورقة الموجَّهين (الرابعة فقط)
   if (lvl===4){
-    const directed = RAW_DATA.current.filter(r=>r.dec==='V');
-    const dirHeader = letterheadRows('قائمة الموجَّهين إلى مراكز التكوين المهني');
-    dirHeader.push(['اللقب والاسم','الجنس','تاريخ الميلاد','الفوج الأصلي']);
-    directed.forEach(s=> dirHeader.push([s.ln+' '+s.fn, s.g==='M'?'ذكر':'أنثى', s.dob, 'فوج '+s.sec]));
-    const wsDir = XLSX.utils.aoa_to_sheet(dirHeader);
-    wsDir['!cols'] = [{wch:28},{wch:8},{wch:13},{wch:10}];
-    XLSX.utils.book_append_sheet(wb, wsDir, 'الموجَّهون');
+    const dir = RAW_DATA.current.filter(r=>r.dec==='V');
+    const dHead = officialHeader(6, 'قائمة التلاميذ الموجَّهين إلى مراكز التكوين المهني');
+    dHead.push(['الرقم','رقم التعريف','اللقب و الاسم','تاريخ الميلاد','الجنس','القسم الأصلي']);
+    dir.forEach((s,i)=> dHead.push([i+1, String(s.id).slice(-4), s.ln+' '+s.fn, s.dob,
+                                    s.g==='M'?'ذكر':'أنثى', officialClassName(4,s.sec)]));
+    const wsD = XLSX.utils.aoa_to_sheet(dHead);
+    wsD['!cols']=[{wch:6},{wch:11},{wch:30},{wch:14},{wch:8},{wch:14}];
+    XLSX.utils.book_append_sheet(wb, wsD, 'الموجهون');
   }
-  const schoolTag = (STATE.institution.school || 'قوائم').replace(/[\\\/:*?"<>|]/g,'');
-  XLSX.writeFile(wb, `${schoolTag}_${LEVEL_LABEL[lvl]}_${(STATE.institution.year||'2026-2027').replace('/','-')}.xlsx`);
+
+  const tag = (STATE.institution.school || 'قوائم').replace(/[\\\/:*?"<>|]/g,'');
+  XLSX.writeFile(wb, `${tag}_${LEVEL_LABEL[lvl]}_${(STATE.institution.year||'').replace('/','-')}.xlsx`);
+}
+
+/* ── تصدير ورقة التعداد وحدها ── */
+function exportCensus(){
+  if (!STATE.results) return;
+  const wb = XLSX.utils.book_new(); wb.Workbook = { Views: [{RTL:true}] };
+  XLSX.utils.book_append_sheet(wb, buildCensusSheet(), 'تعداد التلاميذ');
+  const tag = (STATE.institution.school || 'تعداد').replace(/[\\\/:*?"<>|]/g,'');
+  XLSX.writeFile(wb, `${tag}_تعداد-التلاميذ_${(STATE.institution.year||'').replace('/','-')}.xlsx`);
+}
+
+/* ── تصدير كل شيء في ملف واحد ── */
+function exportAll(){
+  if (!STATE.results) return;
+  const wb = XLSX.utils.book_new(); wb.Workbook = { Views: [{RTL:true}] };
+  XLSX.utils.book_append_sheet(wb, buildCensusSheet(), 'تعداد التلاميذ');
+  [1,2,3,4].forEach(lvl=>{
+    const secObj = STATE.results[lvl] && STATE.results[lvl].sections;
+    if (!secObj) return;
+    Object.keys(secObj).sort((a,b)=>Number(a)-Number(b)).forEach(k=>{
+      XLSX.utils.book_append_sheet(wb, buildOfficialClassSheet(lvl,k,secObj[k]), officialClassName(lvl,k));
+    });
+  });
+  const tag = (STATE.institution.school || 'قوائم').replace(/[\\\/:*?"<>|]/g,'');
+  XLSX.writeFile(wb, `${tag}_كل-القوائم_${(STATE.institution.year||'').replace('/','-')}.xlsx`);
 }
 function renderExport(){
   const card = document.getElementById('export-card');
@@ -1682,7 +1857,7 @@ function renderExport(){
   const genBtn = document.getElementById('generatePortalBtn');
   const pubStatus = document.getElementById('portalPublishStatus');
   const schoolName = (STATE.institution.school||'').replace(/[\\/:*?"<>|]/g,'').trim() || 'بوابة-التلاميذ';
-  document.getElementById('portalFilename').textContent = schoolName + '-student-portal.html';
+  document.getElementById('portalFilename').textContent = 'student-portal.html';
   if (!STATE.results){
     card.innerHTML = `<div class="empty-state"><div class="big-emoji">📦</div>نفّذ التوزيع أولًا لتفعيل التصدير</div>`;
     if(genBtn) genBtn.disabled = true;
@@ -1690,19 +1865,74 @@ function renderExport(){
     return;
   }
   if(genBtn) genBtn.disabled = false;
+  // institution preview + completeness check
+  const I = STATE.institution;
+  const rowsEl = document.getElementById('portalInstRows');
+  const warnEl = document.getElementById('portalInstWarn');
+  const missing = [];
+  if (!(I.school||'').trim())      missing.push('اسم المؤسسة');
+  if (!(I.directorate||'').trim()) missing.push('مديرية التربية');
+  if (!(I.year||'').trim())        missing.push('السنة الدراسية');
+  if (rowsEl){
+    const row = (lbl, val, req) => {
+      const ok = (val||'').trim();
+      return `<div style="display:flex; gap:8px;">
+        <span style="min-width:130px; color:var(--ink-soft);">${lbl}:</span>
+        <b style="color:${ok?'var(--heading)':'var(--red)'};">${ok?esc(val):(req?'— غير مُدخَل —':'—')}</b>
+      </div>`;
+    };
+    rowsEl.innerHTML =
+      row('الجمهورية', I.republic) +
+      row('الوزارة', I.ministry) +
+      row('مديرية التربية', I.directorate, true) +
+      row('اسم المؤسسة', I.school, true) +
+      row('السنة الدراسية', I.year, true);
+  }
+  if (warnEl) warnEl.style.display = missing.length ? 'flex' : 'none';
   const totalStudents = [1,2,3,4].reduce((s,lvl)=>{
     const sec = STATE.results[lvl]&&STATE.results[lvl].sections||{};
     return s + Object.values(sec).reduce((a,arr)=>a+arr.length,0);
   },0);
   if(pubStatus) pubStatus.innerHTML = `✓ التوزيع مكتمل — <b>${totalStudents}</b> تلميذ موزَّعون — البوابة جاهزة للنشر.`;
-  card.innerHTML = [1,2,3,4].map(lvl=>{
-    const secObj = STATE.results[lvl].sections;
-    const total = Object.values(secObj).reduce((a,arr)=>a+arr.length,0);
-    return `<div class="toggle-row" style="border-bottom:1px solid var(--line); padding:14px 0;">
-      <div style="flex:1;"><div class="lbl-main">${LEVEL_LABEL[lvl]} الجديدة</div><div class="lbl-sub">${Object.keys(secObj).length} فوج — ${total} تلميذ</div></div>
-      <button class="btn gold small" data-export-lvl="${lvl}">⬇ تصدير Excel</button></div>`;
-  }).join('');
+  // إجمالي عام
+  let gAll=0, gNew=0, gRep=0;
+  [1,2,3,4].forEach(lvl=>{
+    const so = STATE.results[lvl] && STATE.results[lvl].sections; if(!so) return;
+    Object.values(so).forEach(arr=>arr.forEach(s=>{
+      gAll++; if (s.status==='REPEAT') gRep++; else gNew++;
+    }));
+  });
+
+  card.innerHTML = `
+    <div style="border:1.5px solid var(--gold); border-radius:9px; padding:14px 16px; margin-bottom:16px; background:linear-gradient(180deg,var(--backup-bg-top),var(--paper-2));">
+      <div style="font-family:'El Messiri',sans-serif; font-weight:700; font-size:14.5px; color:var(--heading); margin-bottom:4px;">📊 تعداد التلاميذ للموسم الجديد</div>
+      <div class="hint" style="margin-bottom:10px;">جدول رسمي يفصّل <b>التلاميذ الجدد</b> و<b>المعيدين</b> (ذكور/إناث) لكل قسم، مع مجاميع كل مستوى والمجموع العام</div>
+      <div style="display:flex; gap:16px; flex-wrap:wrap; margin-bottom:12px; font-size:12.5px;">
+        <span class="g-chip mf">الإجمالي: <b>${gAll}</b></span>
+        <span class="g-chip m">جدد: <b>${gNew}</b></span>
+        <span class="g-chip f">معيدون: <b>${gRep}</b></span>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn gold" id="exportCensusBtn">📊 تصدير ورقة التعداد</button>
+        <button class="btn primary" id="exportAllBtn">📦 تصدير كل القوائم + التعداد (ملف واحد)</button>
+      </div>
+    </div>` +
+    [1,2,3,4].map(lvl=>{
+      const secObj = STATE.results[lvl].sections;
+      const arrs = Object.values(secObj);
+      const total = arrs.reduce((a,x)=>a+x.length,0);
+      const rep   = arrs.reduce((a,x)=>a+x.filter(s=>s.status==='REPEAT').length,0);
+      return `<div class="toggle-row" style="border-bottom:1px solid var(--line); padding:14px 0;">
+        <div style="flex:1;">
+          <div class="lbl-main">${LEVEL_LABEL[lvl]} الجديدة</div>
+          <div class="lbl-sub">${Object.keys(secObj).length} قسم — ${total} تلميذ (${total-rep} جديد · ${rep} معيد)</div>
+        </div>
+        <button class="btn gold small" data-export-lvl="${lvl}">⬇ تصدير Excel</button></div>`;
+    }).join('');
+
   card.querySelectorAll('[data-export-lvl]').forEach(btn=> btn.addEventListener('click', ()=> exportLevel(Number(btn.dataset.exportLvl))));
+  const ecb = document.getElementById('exportCensusBtn'); if (ecb) ecb.addEventListener('click', exportCensus);
+  const eab = document.getElementById('exportAllBtn');    if (eab) eab.addEventListener('click', exportAll);
 }
 
 /* ---------- IMPORT ENGINE ---------- */
@@ -2210,12 +2440,12 @@ function portalSearch(){
       const r = cd.record;
       const lvlTxt = cd.src==='new_arrival' ? 'وافد جديد' : LEVEL_LABEL[r.lvl];
       return `<div class="toggle-row" style="border-bottom:1px solid var(--line); padding:10px 0; cursor:pointer;"
-        onclick="portalShowCard('${cd.src}','${(r.id||r.rank)}')" style="cursor:pointer;">
+        onclick="portalShowCard('${esc(cd.src)}','${esc(r.id||r.rank)}')">
         <div style="flex:1;">
-          <b>${r.ln} ${r.fn}</b> · ${lvlTxt}
+          <b>${esc(r.ln)} ${esc(r.fn)}</b> · ${lvlTxt}
           ${cd.src==='current' ? `· فوج ${r.sec} · معدل ${r.avg}` : '· وافد جديد من الابتدائي'}
         </div>
-        <span style="color:var(--ink-soft); font-size:12px;">${r.dob}</span>
+        <span style="color:var(--ink-soft); font-size:12px;">${esc(r.dob)}</span>
       </div>`;
     }).join('');
     resultEl.innerHTML = `<div class="alert info">وُجد <b>${candidates.length}</b> تلميذ مطابق — اختر الشخص المقصود:</div>
@@ -2273,12 +2503,12 @@ function portalShowCard(src, idOrRank){
     <div class="sc-header">
       <div style="text-align:center;min-width:50px;"><span style="font-size:30px;">🇩🇿</span></div>
       <div class="sc-inst" style="text-align:center;flex:1;">
-        <div class="sc-inst-name">${inst.republic||'الجمهورية الجزائرية الديمقراطية الشعبية'}</div>
-        <div class="sc-inst-sub">${inst.ministry||'وزارة التربية الوطنية'}</div>
-        ${inst.directorate?`<div class="sc-inst-sub">مديرية التربية لولاية ${inst.directorate}</div>`:''}
-        <div class="sc-inst-name" style="margin-top:4px;font-size:17px;">${inst.school||'المتوسطة'}</div>
+        <div class="sc-inst-name">${esc(inst.republic)||'الجمهورية الجزائرية الديمقراطية الشعبية'}</div>
+        <div class="sc-inst-sub">${esc(inst.ministry)||'وزارة التربية الوطنية'}</div>
+        ${inst.directorate?`<div class="sc-inst-sub">مديرية التربية لولاية ${esc(inst.directorate)}</div>`:''}
+        <div class="sc-inst-name" style="margin-top:4px;font-size:17px;">${esc(inst.school)||'المتوسطة'}</div>
       </div>
-      <div class="sc-badge">${inst.year||'2026/2027'}</div>
+      <div class="sc-badge">${esc(inst.year)||'2026/2027'}</div>
     </div>
 
     <div class="sc-title">📋 بطاقة استعلامات التلميذ</div>
@@ -2286,10 +2516,10 @@ function portalShowCard(src, idOrRank){
     <div class="sc-top-row">
       <div class="sc-photo-area">👤</div>
       <div class="sc-top-fields">
-        <div class="sc-field"><label>اللقب</label><div class="val">${r.ln}</div></div>
-        <div class="sc-field"><label>الاسم</label><div class="val">${r.fn}</div></div>
+        <div class="sc-field"><label>اللقب</label><div class="val">${esc(r.ln)}</div></div>
+        <div class="sc-field"><label>الاسم</label><div class="val">${esc(r.fn)}</div></div>
         <div class="sc-field"><label>الجنس</label><div class="val">${r.g==='M'?'ذكر':'أنثى'}</div></div>
-        <div class="sc-field"><label>تاريخ الميلاد</label><div class="val">${r.dob}</div></div>
+        <div class="sc-field"><label>تاريخ الميلاد</label><div class="val">${esc(r.dob)}</div></div>
         <div class="sc-field full"><label>المستوى الدراسي الحالي</label>
           <div class="val">${src==='new_arrival'?'وافد جديد — السنة الأولى متوسط':LEVEL_LABEL[r.lvl]+' · فوج '+r.sec}</div></div>
       </div>
@@ -2360,7 +2590,7 @@ function portalShowCard(src, idOrRank){
         <div class="sc-section-head">📥 معلومات القبول والتوجيه</div>
         <div class="sc-fields">
           <div class="sc-field"><label>معدل القبول</label><div class="val highlight">${r.avg!=null?r.avg.toFixed(2):'—'}/10</div></div>
-          <div class="sc-field"><label>المؤسسة الأصلية</label><div class="val">${r.origin||'—'}</div></div>
+          <div class="sc-field"><label>المؤسسة الأصلية</label><div class="val">${esc(r.origin)||'—'}</div></div>
           <div class="sc-field full"><label>الوضع</label>
             <div style="margin-top:4px;"><span class="sc-status-chip new">وافد جديد — يلتحق بالسنة الأولى متوسط</span></div></div>
         </div>
@@ -2390,9 +2620,9 @@ function portalShowCard(src, idOrRank){
           <div class="sc-field full" style="margin-top:4px;">
             <label>نص التصريح</label>
             <div class="sc-decl">
-              أنا الممضي أسفله، ولي التلميذ(ة) <b>${r.ln} ${r.fn}</b> المتمدرس(ة) بـ${inst.school||'المؤسسة'}
+              أنا الممضي أسفله، ولي التلميذ(ة) <b>${esc(r.ln)} ${esc(r.fn)}</b> المتمدرس(ة) بـ${esc(inst.school)||'المؤسسة'}
               — ${src==='current'?LEVEL_LABEL[r.lvl]:'السنة الأولى متوسط'}${newSection?(' — فوج '+newSection):''} —
-              السنة الدراسية ${inst.year||'2026/2027'}، أصرّح بشرفي بأنني أسمح لابني/ابنتي بالمشاركة في جميع
+              السنة الدراسية ${esc(inst.year)||'2026/2027'}، أصرّح بشرفي بأنني أسمح لابني/ابنتي بالمشاركة في جميع
               التظاهرات الرياضية والثقافية التي تبرمجها المؤسسة داخلها وخارجها، وألتزم بالقانون الداخلي للمؤسسة.
             </div>
           </div>
@@ -2422,7 +2652,7 @@ function portalShowCard(src, idOrRank){
         <div class="sc-fields">
           <div class="sc-field full">
             <div class="sc-decl">
-              أنا الطبيب(ة) الممضي أسفله، أشهد بأن التلميذ(ة) <b>${r.ln} ${r.fn}</b>
+              أنا الطبيب(ة) الممضي أسفله، أشهد بأن التلميذ(ة) <b>${esc(r.ln)} ${esc(r.fn)}</b>
               لا يعاني من أي مرض أو عارض صحي يحول دون ممارسته للأنشطة الرياضية والثقافية
               داخل المؤسسة وخارجها.
             </div>
@@ -2434,9 +2664,9 @@ function portalShowCard(src, idOrRank){
     </div>
 
     <div class="sc-footer">
-      <span>رقم التعريف: ${r.id||('وافد-'+r.rank)}</span>
+      <span>رقم التعريف: ${esc(r.id||('وافد-'+r.rank))}</span>
       <span class="brand brand-credit">DONIA SMART CLASSE — DONIA LABS TECH</span>
-      <span class="brand brand-school" style="display:none;">${inst.school||''}</span>
+      <span class="brand brand-school" style="display:none;">${esc(inst.school)}</span>
       <span>طُبع بتاريخ: ${new Date().toLocaleDateString('ar-DZ')}</span>
     </div>
   </div>`;
@@ -2537,7 +2767,25 @@ function portalClear(){
    This file is uploaded to GitHub by the admin and accessed by students.
 ═══════════════════════════════════════════════════════════════════ */
 function generateStudentPortal(){
-  if (!STATE.results){ alert('نفّذ التوزيع أولًا.'); return; }
+  if (!STATE.results){ alert('نفّذ التوزيع أولًا من صفحة "الخريطة المدرسية".'); return; }
+
+  /* ── guard: don't publish a portal with placeholder institution info ── */
+  const I0 = STATE.institution;
+  const missing = [];
+  if (!(I0.school||'').trim())      missing.push('• اسم المؤسسة');
+  if (!(I0.directorate||'').trim()) missing.push('• مديرية التربية للولاية');
+  if (!(I0.year||'').trim())        missing.push('• السنة الدراسية');
+  if (missing.length){
+    const go = confirm(
+      '⚠️ معلومات المؤسسة ناقصة:\n\n' + missing.join('\n') +
+      '\n\nإن تابعت، ستظهر البوابة للتلاميذ باسم عام بدل اسم مؤسستك.\n\n' +
+      'اضغط "إلغاء" لإكمال البيانات أولًا من صفحة "معلومات المؤسسة"، أو "موافق" للمتابعة رغم ذلك.'
+    );
+    if (!go){
+      document.querySelector('[data-panel="institution"]').click();
+      return;
+    }
+  }
 
   /* ── 1. Flatten all distributed students into a lookup table ── */
   const lookup = {}; // key: "lastname|dob" → {name, dob, lvl, section, status, avg, origin, id}
@@ -2582,7 +2830,7 @@ function generateStudentPortal(){
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>بوابة التلاميذ — ${inst.school||'المتوسطة'}</title>
+<title>بوابة التلاميذ — ${esc(inst.school)||'المتوسطة'}</title>
 ${favSrc ? `<link rel="icon" href="${favSrc}">` : ''}
 <style>
   @import url('https://fonts.googleapis.com/css2?family=El+Messiri:wght@500;600;700&family=Tajawal:wght@400;500;700&display=swap');
@@ -2732,11 +2980,11 @@ ${favSrc ? `<link rel="icon" href="${favSrc}">` : ''}
   <div class="hdr-top">
     ${logoSrc ? `<img class="hdr-logo" src="${logoSrc}" alt="شعار">` : '<span style="font-size:38px;">🏫</span>'}
     <div class="hdr-inst">
-      <div class="republic">${inst.republic||'الجمهورية الجزائرية الديمقراطية الشعبية'}</div>
-      <div class="ministry">${inst.ministry||'وزارة التربية الوطنية'}${inst.directorate?' — مديرية التربية لولاية '+inst.directorate:''}</div>
-      <div class="school-name">${inst.school||'المتوسطة'}</div>
+      <div class="republic">${esc(inst.republic)||'الجمهورية الجزائرية الديمقراطية الشعبية'}</div>
+      <div class="ministry">${esc(inst.ministry)||'وزارة التربية الوطنية'}${inst.directorate?' — مديرية التربية لولاية '+esc(inst.directorate):''}</div>
+      <div class="school-name">${esc(inst.school)||'المتوسطة'}</div>
     </div>
-    <div class="hdr-badge">${inst.year||'2026/2027'}</div>
+    <div class="hdr-badge">${esc(inst.year)||'2026/2027'}</div>
   </div>
   <div class="hdr-tagline">🎓 البوابة الإلكترونية للتلاميذ — اطّلع على فوجك وطبع استمارتك</div>
 </header>
@@ -2763,8 +3011,8 @@ ${favSrc ? `<link rel="icon" href="${favSrc}">` : ''}
 <div class="student-card-wrap" id="cardWrap" style="display:none;"></div>
 
 <footer class="site-footer no-print">
-  نُشرت هذه البوابة بواسطة <b>${inst.school||'المؤسسة التعليمية'}</b> —
-  السنة الدراسية ${inst.year||'2026/2027'} — تاريخ النشر: ${publishedAt}<br>
+  نُشرت هذه البوابة بواسطة <b>${esc(inst.school)||'المؤسسة التعليمية'}</b> —
+  السنة الدراسية ${esc(inst.year)||'2026/2027'} — تاريخ إصدار هذه النسخة: ${esc(publishedAt)}<br>
   مدعومة بـ <a href="https://donialabstech.online" target="_blank">DONIA LABS TECH</a> — DONIA SMART CLASSE
 </footer>
 
@@ -2778,6 +3026,10 @@ const LOGO_SRC = ${JSON.stringify(logoSrc)};
 const norm = s => (s||'').replace(/[\\u064B-\\u065F\\u0670]/g,'')
                           .replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي')
                           .toLowerCase().trim();
+/* escape values before injecting into markup */
+const esc = v => (v===null||v===undefined) ? '' : String(v)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 
 function doSearch(){
   const nameQ = norm(document.getElementById('sName').value);
@@ -2806,10 +3058,10 @@ function doSearch(){
 
   if (matches.length > 1){
     const listHtml = matches.slice(0,8).map(s=>\`
-      <div class="result-list-item" onclick="showCard('\${s.uid}')">
+      <div class="result-list-item" onclick="showCard('\${esc(s.uid)}')">
         <div>
-          <div class="rli-name">\${s.name}</div>
-          <div class="rli-meta">\${LEVEL_LBL[s.lvl]} · فوج \${s.section} · \${s.dob}</div>
+          <div class="rli-name">\${esc(s.name)}</div>
+          <div class="rli-meta">\${esc(LEVEL_LBL[s.lvl])} · فوج \${esc(s.section)} · \${esc(s.dob)}</div>
         </div>
         <span class="rli-arrow">›</span>
       </div>\`).join('');
@@ -2837,19 +3089,19 @@ function showCard(uid){
     <div class="scard-header">
       \${LOGO_SRC ? '<img class="sh-logo" src="'+LOGO_SRC+'" alt="">' : '<span style="font-size:36px;">🇩🇿</span>'}
       <div class="sh-inst">
-        <div class="sh-republic">\${INST.republic||'الجمهورية الجزائرية الديمقراطية الشعبية'}</div>
-        <div class="sh-name">\${INST.school||'المتوسطة'}</div>
-        \${INST.directorate?'<div style="font-size:11px;color:#C9BE9E;">مديرية التربية لولاية '+INST.directorate+'</div>':''}
+        <div class="sh-republic">\${esc(INST.republic)||'الجمهورية الجزائرية الديمقراطية الشعبية'}</div>
+        <div class="sh-name">\${esc(INST.school)||'المتوسطة'}</div>
+        \${INST.directorate?'<div style="font-size:11px;color:#C9BE9E;">مديرية التربية لولاية '+esc(INST.directorate)+'</div>':''}
       </div>
-      <div class="sh-year">\${INST.year||'2026/2027'}</div>
+      <div class="sh-year">\${esc(INST.year)||'2026/2027'}</div>
     </div>
     <div class="scard-title">📋 بطاقة استعلامات التلميذ</div>
 
     <div class="fawj-banner">
       <div class="fb-label">✅ تم توجيهك إلى</div>
-      <div class="fb-lvl">\${LEVEL_LBL[s.lvl]}</div>
-      <div class="fb-num">\${s.section}</div>
-      <div class="fb-fawj">الفوج \${s.section}</div>
+      <div class="fb-lvl">\${esc(LEVEL_LBL[s.lvl])}</div>
+      <div class="fb-num">\${esc(s.section)}</div>
+      <div class="fb-fawj">الفوج \${esc(s.section)}</div>
       <span class="status-chip \${statusCls[s.status]||'promoted'}">\${statusLabel[s.status]||'—'}</span>
       \${s.b10 ? '<span class="status-chip new" style="margin-right:8px;">★ مولود 2010 — حق الإعادة</span>' : ''}
     </div>
@@ -2858,13 +3110,13 @@ function showCard(uid){
       <div class="info-section">
         <div class="info-section-head">👤 معلومات التلميذ</div>
         <div class="info-fields">
-          <div class="info-field"><label>اللقب</label><div class="val">\${s.name.split(' ').slice(0,2).join(' ')}</div></div>
-          <div class="info-field"><label>الاسم</label><div class="val">\${s.name.split(' ').slice(2).join(' ')||s.name}</div></div>
-          <div class="info-field"><label>تاريخ الميلاد</label><div class="val">\${s.dob}</div></div>
-          <div class="info-field"><label>المستوى الدراسي</label><div class="val">\${LEVEL_LBL[s.lvl]}</div></div>
-          <div class="info-field"><label>الفوج الجديد</label><div class="val big">فوج \${s.section}</div></div>
+          <div class="info-field"><label>اللقب</label><div class="val">\${esc(s.name.split(' ').slice(0,2).join(' '))}</div></div>
+          <div class="info-field"><label>الاسم</label><div class="val">\${esc(s.name.split(' ').slice(2).join(' ')||s.name)}</div></div>
+          <div class="info-field"><label>تاريخ الميلاد</label><div class="val">\${esc(s.dob)}</div></div>
+          <div class="info-field"><label>المستوى الدراسي</label><div class="val">\${esc(LEVEL_LBL[s.lvl])}</div></div>
+          <div class="info-field"><label>الفوج الجديد</label><div class="val big">فوج \${esc(s.section)}</div></div>
           <div class="info-field"><label>المعدل</label><div class="val big">\${avgDisplay}</div></div>
-          \${s.origin ? '<div class="info-field full"><label>الابتدائية الأصلية</label><div class="val">'+s.origin+'</div></div>' : ''}
+          \${s.origin ? '<div class="info-field full"><label>الابتدائية الأصلية</label><div class="val">'+esc(s.origin)+'</div></div>' : ''}
         </div>
       </div>
 
@@ -2917,9 +3169,9 @@ function showCard(uid){
           <div class="info-field"><label>الصادرة عن دائرة</label><input class="p-input"></div>
           <div class="info-field full">
             <div class="decl-text">
-              أنا الممضي أسفله، ولي التلميذ(ة) <b>\${s.name}</b> المتمدرس(ة) في
-              \${INST.school||'المؤسسة'} — \${LEVEL_LBL[s.lvl]} — فوج \${s.section} —
-              السنة الدراسية \${INST.year||'2026/2027'}، أصرح بأنه يسمح لابني/ابنتي بالمشاركة
+              أنا الممضي أسفله، ولي التلميذ(ة) <b>\${esc(s.name)}</b> المتمدرس(ة) في
+              \${esc(INST.school)||'المؤسسة'} — \${esc(LEVEL_LBL[s.lvl])} — فوج \${esc(s.section)} —
+              السنة الدراسية \${esc(INST.year)||'2026/2027'}، أصرح بأنه يسمح لابني/ابنتي بالمشاركة
               في جميع التظاهرات الرياضية والثقافية التي تبرمجها المؤسسة طيلة الموسم الدراسي
               داخل وخارج المؤسسة، وأن التزم بالقانون الداخلي للمؤسسة.
             </div>
@@ -2946,7 +3198,7 @@ function showCard(uid){
         <div class="info-fields">
           <div class="info-field full">
             <div class="decl-text">
-              أنا الطبيب الممضي أسفله، أشهد أن التلميذ(ة) <b>\${s.name}</b>
+              أنا الطبيب الممضي أسفله، أشهد أن التلميذ(ة) <b>\${esc(s.name)}</b>
               لا يعاني من أي مرض أو عارض يحول دون ممارسته للأنشطة الرياضية والثقافية
               داخل المؤسسة وخارجها.
             </div>
@@ -2958,10 +3210,10 @@ function showCard(uid){
     </div>
 
     <div class="scard-footer">
-      <span>رقم: \${s.uid}</span>
+      <span>رقم: \${esc(s.uid)}</span>
       <span class="brand brand-credit">DONIA SMART CLASSE</span>
-      <span class="brand brand-school" style="display:none;">\${INST.school||''}</span>
-      <span>\${INST.school||''} — \${INST.year||''}</span>
+      <span class="brand brand-school" style="display:none;">\${esc(INST.school)}</span>
+      <span>\${esc(INST.school)} — \${esc(INST.year)}</span>
     </div>
   </div>\`;
 
@@ -3036,16 +3288,21 @@ function toggleBrand(hide){
   const blob = new Blob([portalHtml], {type:'text/html;charset=utf-8'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  const schoolSlug = (inst.school||'school').replace(/[^a-zA-Z0-9\u0600-\u06FF]/g,'-');
   a.href = url;
-  a.download = schoolSlug + '-student-portal.html';
+  a.download = 'student-portal.html';   // اسم ثابت وبسيط — سهل الرفع والمشاركة
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 1500);
 
   /* ── 5. Show success info ── */
   const msg = document.getElementById('portalDownloadedMsg');
   const urlEl = document.getElementById('portalShareUrl');
+  const stampEl = document.getElementById('portalStamp');
   if (msg){ msg.style.display = 'block'; }
+  if (stampEl){
+    const nStu = students.length;
+    stampEl.innerHTML = `🕒 وُلِّدت الآن (${new Date().toLocaleString('ar-DZ')}) — تحتوي
+      <b>${nStu}</b> تلميذ — باسم <b>${esc(inst.school)||'(بدون اسم مؤسسة)'}</b>`;
+  }
   if (urlEl){
     const repoGuess = window.location.hostname.includes('github.io')
       ? window.location.href.replace('index.html','').replace(/\/$/, '') + '/' + a.download
@@ -3140,7 +3397,9 @@ document.querySelectorAll('.nav-btn').forEach(btn=>{
 ['inst_republic','inst_ministry','inst_directorate','inst_school','inst_year'].forEach(id=>{
   document.getElementById(id).addEventListener('input', e=>{
     const map = {inst_republic:'republic', inst_ministry:'ministry', inst_directorate:'directorate', inst_school:'school', inst_year:'year'};
-    STATE.institution[map[id]] = e.target.value; persist(); renderOverview();
+    STATE.institution[map[id]] = e.target.value; persist();
+    renderOverview();
+    renderExport();   // keep the portal preview / warning in sync
     document.getElementById('sidebarSchoolName').textContent = (STATE.institution.school ? STATE.institution.school + ' — ' : '') + (STATE.institution.year || '2026/2027');
   });
 });
